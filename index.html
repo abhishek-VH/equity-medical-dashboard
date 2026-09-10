@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Equity Medical — Project Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231b2a4a'/><circle cx='50' cy='50' r='28' fill='none' stroke='%231a9c8f' stroke-width='14' stroke-dasharray='105 71' transform='rotate(-90 50 50)'/></svg>">
+<style>
+  :root { --bg: #f3f5f9; --card: #ffffff; --ink: #1b2a4a; --muted: #6b7280; --line: #d9dee8; --accent: #1a9c8f; --accent-ink: #ffffff; --err: #b42318; --err-bg: #fef3f2; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0f1626; --card: #172038; --ink: #e6ebf5; --muted: #98a2b8; --line: #2a3554; --accent: #1fb8a8; --err: #ff8a80; --err-bg: #3a1f1f; } }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: grid; place-items: center; padding: 24px; }
+  .card { width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 32px 28px; box-shadow: 0 18px 48px rgba(16, 24, 40, .12); }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .brand svg { width: 44px; height: 44px; flex: none; }
+  .brand b { display: block; font-size: 17px; }
+  .brand small { color: var(--muted); font-size: 12.5px; }
+  h1 { font-size: 15px; font-weight: 600; margin: 0 0 6px; }
+  p.hint { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+  label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  .row { display: flex; gap: 8px; }
+  input[type=password], input[type=text] { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--ink); font: inherit; outline: none; }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26, 156, 143, .18); }
+  button.eye { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 10px; padding: 0 12px; cursor: pointer; font: inherit; }
+  button.go { width: 100%; margin-top: 14px; padding: 11px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; }
+  button.go[disabled] { opacity: .6; cursor: progress; }
+  .remember { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 14px; }
+  .err { display: none; margin-top: 12px; padding: 9px 12px; border-radius: 10px; background: var(--err-bg); color: var(--err); font-size: 13px; }
+  .err.show { display: block; }
+  .foot { margin-top: 20px; font-size: 11.5px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<form class="card" id="gate" autocomplete="off">
+  <div class="brand">
+    <svg viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="20" fill="#1b2a4a"/><circle cx="50" cy="50" r="28" fill="none" stroke="#1a9c8f" stroke-width="14" stroke-dasharray="105 71" transform="rotate(-90 50 50)"/></svg>
+    <div><b>Equity Medical</b><small>GHL → Life Sciences Cloud · project dashboard</small></div>
+  </div>
+  <h1>This dashboard is private</h1>
+  <p class="hint">Enter the access password to open the project status site.</p>
+  <label for="pw">Password</label>
+  <div class="row">
+    <input id="pw" type="password" autofocus autocomplete="current-password" spellcheck="false">
+    <button type="button" class="eye" id="eye" title="Show / hide">👁</button>
+  </div>
+  <label class="remember"><input type="checkbox" id="remember"> Remember me on this browser</label>
+  <button class="go" id="go" type="submit">Open dashboard</button>
+  <div class="err" id="err">Incorrect password. Please try again.</div>
+  <div class="foot">ValueHub · content is encrypted and unlocked in your browser</div>
+</form>
+
+<!-- Crypto helpers. This block is re-injected into the unlocked page so it can keep polling for updates. -->
+<script id="em-crypto">
+window.EM_CRYPTO = (function () {
+  const PAYLOAD = 'payload.json';
+  const KEYS = { pass: 'em-dash-pass' };
+  let cachedKey = null, cachedSalt = null, cachedPw = null;
+  const b64d = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  async function deriveKey(password, kdf) {
+    if (cachedKey && cachedSalt === kdf.salt && cachedPw === password) return cachedKey;
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+    cachedKey = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64d(kdf.salt), iterations: kdf.iter, hash: kdf.hash }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    cachedSalt = kdf.salt; cachedPw = password;
+    return cachedKey;
+  }
+  async function fetchPayload() {
+    const r = await fetch(PAYLOAD + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('payload ' + r.status);
+    return r.json();
+  }
+  async function unlock(password, payload) {
+    const key = await deriveKey(password, payload.kdf);
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64d(payload.iv) }, key, b64d(payload.ct));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }
+  function savedPassword() { try { return sessionStorage.getItem(KEYS.pass) || localStorage.getItem(KEYS.pass) || ''; } catch (e) { return ''; } }
+  function remember(password, persist) { try { sessionStorage.setItem(KEYS.pass, password); if (persist) localStorage.setItem(KEYS.pass, password); } catch (e) {} }
+  function forget() { cachedKey = null; cachedPw = null; try { sessionStorage.removeItem(KEYS.pass); localStorage.removeItem(KEYS.pass); } catch (e) {} }
+  return { fetchPayload, unlock, savedPassword, remember, forget };
+})();
+</script>
+
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const form = $('#gate'), pw = $('#pw'), go = $('#go'), err = $('#err');
+  let payloadPromise = window.EM_CRYPTO.fetchPayload();   // start downloading while the user types
+
+  $('#eye').addEventListener('click', () => { pw.type = pw.type === 'password' ? 'text' : 'password'; pw.focus(); });
+
+  function showError(msg) { err.textContent = msg; err.classList.add('show'); go.disabled = false; go.textContent = 'Open dashboard'; pw.select(); }
+
+  async function tryOpen(password, persist, silent) {
+    go.disabled = true; go.textContent = 'Unlocking…'; err.classList.remove('show');
+    let payload;
+    try { payload = await payloadPromise; } catch (e) { payloadPromise = window.EM_CRYPTO.fetchPayload(); return showError('Could not load the dashboard data. Check your connection and try again.'); }
+    let bundle;
+    try { bundle = await window.EM_CRYPTO.unlock(password, payload); }
+    catch (e) { if (silent) { window.EM_CRYPTO.forget(); go.disabled = false; go.textContent = 'Open dashboard'; return; } return showError('Incorrect password. Please try again.'); }
+    window.EM_CRYPTO.remember(password, persist);
+    render(bundle);
+  }
+
+  function render(bundle) {
+    const cryptoSrc = document.getElementById('em-crypto').textContent;
+    const dataJs = 'window.EM_DATA = ' + JSON.stringify(bundle.data).replace(/<\//g, '<\\/') + ';';
+    const prelude = `<script>${cryptoSrc}
+window.EM_ONLINE = true; window.EM_POLL_MS = 60000;
+window.EM_FETCH_DATA = async function () { const p = await window.EM_CRYPTO.fetchPayload(); const b = await window.EM_CRYPTO.unlock(window.EM_CRYPTO.savedPassword(), p); return b.data; };
+document.addEventListener('DOMContentLoaded', function () {
+  const bar = document.querySelector('.topbar'), menu = document.getElementById('export-menu');
+  if (!bar || !menu) return;
+  const b = document.createElement('button'); b.className = 'btn'; b.textContent = '🔒 Lock'; b.title = 'Forget the password on this browser and return to the password screen';
+  b.addEventListener('click', function () { window.EM_CRYPTO.forget(); location.reload(); });
+  bar.insertBefore(b, menu);
+});
+<\/script>`;
+    const html = bundle.html.replace('<!' + '--EM_PRELUDE--' + '>', () => prelude).replace('<!' + '--EM_DATA--' + '>', () => '<script>' + dataJs + '<\/script>');
+    document.open(); document.write(html); document.close();
+  }
+
+  form.addEventListener('submit', (e) => { e.preventDefault(); const v = pw.value; if (!v) { pw.focus(); return; } tryOpen(v, $('#remember').checked, false); });
+
+  const saved = window.EM_CRYPTO.savedPassword();
+  if (saved) tryOpen(saved, false, true);
+})();
+</script>
+</body>
+</html>
